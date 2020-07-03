@@ -1,7 +1,7 @@
-mod rusty_cli;
-use rusty_cli::{add, append};
+mod subcommands;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use subcommands::{add, append, RcronError};
 
 #[derive(StructOpt, Debug)]
 #[structopt(about = "Cronjob utility program.")]
@@ -20,11 +20,12 @@ enum RustyCron {
     },
 }
 
-fn main() {
+fn main() -> Result<(), RcronError> {
     let rcron: RustyCron = RustyCron::from_args();
     match rcron {
-        RustyCron::Add { file } => add(&file),
-        RustyCron::Append { job } => append(job),
-        _ => println!("something else"),
+        RustyCron::Add { file } => add(&file)?,
+        RustyCron::Append { job } => append(job)?,
+        _ => return Err(RcronError),
     }
+    Ok(())
 }
