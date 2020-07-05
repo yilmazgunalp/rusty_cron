@@ -6,21 +6,36 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 pub fn add(file: &PathBuf) -> Result<(), RcronError> {
-    let status = Command::new("crontab").arg(file).status().unwrap_or_else({
+    let status = Command::new("crontab").arg(file).status().map_err({
         |error| {
             if error.kind() == ErrorKind::NotFound {
-                panic!("crontab must be installed!");
+                return RcronError {
+                    msg: String::from("crontab must be installed!"),
+                };
             } else {
-                panic!("Problem running crontab command: {:?}", error);
+                return RcronError {
+                    msg: String::from(format!("Problem running crontab command: {:?}", error)),
+                };
             }
         }
     });
 
-    if status.success() {
-        println!("{:?} has been added to crontab!", file.file_name().unwrap());
-        return Ok(());
-    } else {
-        panic!("crontab command failed with error decribed above this line");
+    match status {
+        Err(error) => return Err(error),
+        Ok(exitstatus) => {
+            if exitstatus.success() {
+                println!(
+                    "{:?} has been added to crontab!",
+                    file.file_name()
+                        .unwrap_or(&OsString::from("_file_not_found"))
+                );
+                return Ok(());
+            } else {
+                Err(RcronError {
+                    msg: String::from("crontab command failed with error decribed above this line"),
+                })
+            }
+        }
     }
 }
 
@@ -32,11 +47,9 @@ pub fn append(mut job: String) -> Result<(), RcronError> {
 
     // read crontab entries and write to temp file
     let mut crontab_contents: Vec<u8> = Vec::new();
-    // need to get rid of these 3 unwraps!!!!
-    let bytes_read = read_crontab()
-        .unwrap()
+    let bytes_read = read_crontab()?
         .stdout
-        .unwrap()
+        .ok_or(RcronError::default())?
         .read_to_end(&mut crontab_contents)?;
 
     tmp_file.write(&crontab_contents[0..bytes_read])?;
@@ -46,7 +59,7 @@ pub fn append(mut job: String) -> Result<(), RcronError> {
     tmp_file.write(String::as_bytes(&job)).unwrap();
 
     // call add() to update crontab
-    add(&PathBuf::from(&tmp_file_path));
+    add(&PathBuf::from(&tmp_file_path))?;
 
     // remove temp file
     let status = Command::new("rm").arg(tmp_file_path).status();
@@ -62,17 +75,21 @@ fn read_crontab() -> ioResult<Child> {
         .stdout(Stdio::piped())
         .spawn()
 }
-#[derive(Debug)]
-pub struct RcronError;
+#[derive(Debug, Default)]
+pub struct RcronError {
+    pub msg: String,
+}
 
 impl fmt::Display for RcronError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SuperErrorSideKick is here!")
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.msg)
     }
 }
 
 impl From<Error> for RcronError {
     fn from(error: Error) -> Self {
-        Self
+        RcronError {
+            msg: error.to_string(),
+        }
     }
 }

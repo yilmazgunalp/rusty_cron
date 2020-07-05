@@ -25,7 +25,11 @@ fn main() -> Result<(), RcronError> {
     match rcron {
         RustyCron::Add { file } => add(&file)?,
         RustyCron::Append { job } => append(job)?,
-        _ => return Err(RcronError),
+        _ => {
+            return Err(RcronError {
+                msg: String::from("Not implemented yet!"),
+            })
+        }
     }
     Ok(())
 }
