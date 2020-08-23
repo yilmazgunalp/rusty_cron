@@ -1,11 +1,12 @@
 use std::ffi::OsString;
 use std::fmt;
 use std::fs;
+use std::fs::File;
 use std::io::{Error, ErrorKind, Read, Result as ioResult, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
-pub fn add(file: &PathBuf) -> Result<(), RcronError> {
+pub fn replace(file: &PathBuf) -> Result<(), RcronError> {
     let status = Command::new("crontab").arg(file).status().map_err({
         |error| {
             if error.kind() == ErrorKind::NotFound {
@@ -59,7 +60,41 @@ pub fn append(mut job: String) -> Result<(), RcronError> {
     tmp_file.write(String::as_bytes(&job)).unwrap();
 
     // call add() to update crontab
-    add(&PathBuf::from(&tmp_file_path))?;
+    replace(&PathBuf::from(&tmp_file_path))?;
+
+    // remove temp file
+    let status = Command::new("rm").arg(tmp_file_path).status();
+    if let Err(_) = status {
+        println!("failed to remove temp file");
+    }
+    Ok(())
+}
+
+pub fn add(file: &PathBuf) -> Result<(), RcronError> {
+    // create a temp file
+    let tmp_file_path: OsString = OsString::from("rcron_tmp_file.tmp");
+    let mut tmp_file: fs::File =
+        fs::File::create(&tmp_file_path).expect("Failed at creating tmp cron file");
+
+    // read crontab entries and write to temp file
+    let mut crontab_contents: Vec<u8> = Vec::new();
+    let bytes_read = read_crontab()?
+        .stdout
+        .ok_or(RcronError::default())?
+        .read_to_end(&mut crontab_contents)?;
+
+    tmp_file.write(&crontab_contents[0..bytes_read])?;
+
+    // read the contents of the parameter file
+    let mut param_file = File::open(file)?;
+    let mut param_file_contents: Vec<u8> = Vec::new();
+    param_file.read_to_end(&mut param_file_contents)?;
+
+    // add the contents to temp file
+    tmp_file.write(&param_file_contents[0..])?;
+
+    // call replace() to update crontab
+    replace(&PathBuf::from(&tmp_file_path))?;
 
     // remove temp file
     let status = Command::new("rm").arg(tmp_file_path).status();

@@ -1,7 +1,7 @@
 mod subcommands;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use subcommands::{add, append, RcronError};
+use subcommands::{add, append, replace, RcronError};
 
 #[derive(StructOpt, Debug)]
 #[structopt(about = "Cronjob utility program.")]
@@ -24,6 +24,7 @@ fn main() -> Result<(), RcronError> {
     let rcron: RustyCron = RustyCron::from_args();
     match rcron {
         RustyCron::Add { file } => add(&file)?,
+        RustyCron::Replace { file } => replace(&file)?,
         RustyCron::Append { job } => append(job)?,
         _ => {
             return Err(RcronError {
