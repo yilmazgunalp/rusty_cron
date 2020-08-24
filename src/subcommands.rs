@@ -41,25 +41,12 @@ pub fn replace(file: &PathBuf) -> Result<(), RcronError> {
 }
 
 pub fn append(mut job: String) -> Result<(), RcronError> {
-    // create a temp file
-    let tmp_file_path: OsString = OsString::from("rcron_tmp_file.tmp");
-    let mut tmp_file: fs::File =
-        fs::File::create(&tmp_file_path).expect("Failed at creating tmp cron file");
-
-    // read crontab entries and write to temp file
-    let mut crontab_contents: Vec<u8> = Vec::new();
-    let bytes_read = read_crontab()?
-        .stdout
-        .ok_or(RcronError::default())?
-        .read_to_end(&mut crontab_contents)?;
-
-    tmp_file.write(&crontab_contents[0..bytes_read])?;
-
+    let (mut tmp_file, tmp_file_path) = create_tmp_file()?;
     // add \n to job string and write to temp file
     job.push('\n');
     tmp_file.write(String::as_bytes(&job)).unwrap();
 
-    // call add() to update crontab
+    // call replace() to update crontab
     replace(&PathBuf::from(&tmp_file_path))?;
 
     // remove temp file
@@ -71,20 +58,7 @@ pub fn append(mut job: String) -> Result<(), RcronError> {
 }
 
 pub fn add(file: &PathBuf) -> Result<(), RcronError> {
-    // create a temp file
-    let tmp_file_path: OsString = OsString::from("rcron_tmp_file.tmp");
-    let mut tmp_file: fs::File =
-        fs::File::create(&tmp_file_path).expect("Failed at creating tmp cron file");
-
-    // read crontab entries and write to temp file
-    let mut crontab_contents: Vec<u8> = Vec::new();
-    let bytes_read = read_crontab()?
-        .stdout
-        .ok_or(RcronError::default())?
-        .read_to_end(&mut crontab_contents)?;
-
-    tmp_file.write(&crontab_contents[0..bytes_read])?;
-
+    let (mut tmp_file, tmp_file_path) = create_tmp_file()?;
     // read the contents of the parameter file
     let mut param_file = File::open(file)?;
     let mut param_file_contents: Vec<u8> = Vec::new();
@@ -102,6 +76,23 @@ pub fn add(file: &PathBuf) -> Result<(), RcronError> {
         println!("failed to remove temp file");
     }
     Ok(())
+}
+
+fn create_tmp_file() -> Result<(File, OsString), RcronError> {
+    // create a temp file
+    let tmp_file_path: OsString = OsString::from("rcron_tmp_file.tmp");
+    let mut tmp_file: fs::File =
+        fs::File::create(&tmp_file_path).expect("Failed at creating tmp cron file");
+
+    // read crontab entries and write to temp file
+    let mut crontab_contents: Vec<u8> = Vec::new();
+    let bytes_read = read_crontab()?
+        .stdout
+        .ok_or(RcronError::default())?
+        .read_to_end(&mut crontab_contents)?;
+
+    tmp_file.write(&crontab_contents[0..bytes_read])?;
+    Ok((tmp_file, tmp_file_path))
 }
 
 fn read_crontab() -> ioResult<Child> {
