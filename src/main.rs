@@ -26,11 +26,6 @@ fn main() -> Result<(), RcronError> {
         RustyCron::Add { file } => add(&file)?,
         RustyCron::Replace { file } => replace(&file)?,
         RustyCron::Append { job } => append(job)?,
-        _ => {
-            return Err(RcronError {
-                msg: String::from("Not implemented yet!"),
-            })
-        }
     }
     Ok(())
 }

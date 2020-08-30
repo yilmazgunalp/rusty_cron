@@ -119,3 +119,60 @@ impl From<Error> for RcronError {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use assert_cmd::prelude::*;
+    use predicates::prelude::*;
+    use std::io::Write;
+    use std::process::Command;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn add_crontab_file() -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = NamedTempFile::new()?;
+        writeln!(file, "* * * * 5 echo hello")?;
+        let mut cmd = Command::cargo_bin("rusty_cron")?;
+        cmd.arg("add").arg(file.path());
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("has been added"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn add_crontab_file_with_with_invalid_format() -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = NamedTempFile::new()?;
+        // invalid crontab entry
+        writeln!(file, "* * * *5")?;
+        let mut cmd = Command::cargo_bin("rusty_cron")?;
+        cmd.arg("add").arg(file.path());
+        cmd.assert().failure();
+
+        Ok(())
+    }
+
+    #[test]
+    fn append_crontab() -> Result<(), Box<dyn std::error::Error>> {
+        let mut cmd = Command::cargo_bin("rusty_cron")?;
+        cmd.arg("append").arg("* * * 5 * echo hello");
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("has been added"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn replace_crontab() -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = NamedTempFile::new()?;
+        writeln!(file, "* * * * 5 echo hello")?;
+        let mut cmd = Command::cargo_bin("rusty_cron")?;
+        cmd.arg("replace").arg(file.path());
+        cmd.assert()
+            .success()
+            .stdout(predicate::str::contains("has been added"));
+
+        Ok(())
+    }
+}
